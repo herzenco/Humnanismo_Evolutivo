@@ -1,0 +1,63 @@
+import type { MetadataRoute } from 'next'
+import { books } from '@/data/books'
+import { events } from '@/data/events'
+import { podcastSeries } from '@/data/media'
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  const baseUrl = 'https://yosoynosotros.com'
+
+  // Static pages
+  const staticPages = [
+    '',
+    '/autor',
+    '/libros',
+    '/medios',
+    '/eventos',
+    '/contacto',
+    '/vision',
+    '/chatbot',
+    '/privacidad',
+    '/terminos',
+  ].map(route => ({
+    url: `${baseUrl}${route}`,
+    lastModified: new Date(),
+    changeFrequency: 'monthly' as const,
+    priority: route === '' ? 1 : 0.8,
+  }))
+
+  // Book detail pages
+  const bookPages = books.map(book => ({
+    url: `${baseUrl}/libros/${book.id}`,
+    lastModified: new Date(),
+    changeFrequency: 'monthly' as const,
+    priority: 0.7,
+  }))
+
+  // Event detail pages
+  const eventPages = events.map(event => ({
+    url: `${baseUrl}/eventos/${event.id}`,
+    lastModified: new Date(),
+    changeFrequency: 'monthly' as const,
+    priority: 0.6,
+  }))
+
+  // Podcast show pages
+  const showPages = podcastSeries.map(series => ({
+    url: `${baseUrl}/medios/show/${series.id}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly' as const,
+    priority: 0.6,
+  }))
+
+  // Individual episode pages
+  const episodePages = podcastSeries.flatMap(series =>
+    series.episodes.map(ep => ({
+      url: `${baseUrl}/medios/${series.id}/${ep.slug}`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly' as const,
+      priority: 0.5,
+    }))
+  )
+
+  return [...staticPages, ...bookPages, ...eventPages, ...showPages, ...episodePages]
+}
