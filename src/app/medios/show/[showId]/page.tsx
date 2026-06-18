@@ -13,6 +13,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { podcastSeries } from '@/data/media';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getPodcastEpisodeContent } from '@/data/podcastEpisodeContent';
 
 export default function ShowDetailPage({ params }: { params: Promise<{ showId: string }> }) {
   const { showId } = use(params);
@@ -199,41 +200,47 @@ export default function ShowDetailPage({ params }: { params: Promise<{ showId: s
             className="max-w-6xl mx-auto"
           >
             <div className="space-y-6">
-              {show.episodes.map((episode) => (
-                <motion.div
-                  key={episode.id}
-                  variants={itemVariants}
-                  className="group"
-                >
-                  <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-500 p-6 border border-cream">
-                    <div className="flex items-start gap-6">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-4 text-sm text-navy-light mb-3">
-                          <Badge variant="secondary" className="bg-gold/10 text-gold border-gold/20">
-                            {t(episode.categoryKey)}
-                          </Badge>
+              {show.episodes.map((episode) => {
+                const suppliedContent = getPodcastEpisodeContent(episode.audioUrl);
+                const episodeTitle = suppliedContent?.title ?? t(episode.titleKey);
+                const episodeDescription = suppliedContent?.description ?? t(episode.descriptionKey);
+
+                return (
+                  <motion.div
+                    key={episode.id}
+                    variants={itemVariants}
+                    className="group"
+                  >
+                    <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-500 p-6 border border-cream">
+                      <div className="flex items-start gap-6">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-4 text-sm text-navy-light mb-3">
+                            <Badge variant="secondary" className="bg-gold/10 text-gold border-gold/20">
+                              {t(episode.categoryKey)}
+                            </Badge>
+                          </div>
+
+                          <h3 className="font-heading text-2xl font-semibold mb-3 text-navy-dark leading-tight group-hover:text-gold transition-colors">
+                            {episodeTitle}
+                          </h3>
+
+                          <p className="text-navy-light leading-relaxed mb-6 line-clamp-3">
+                            {episodeDescription}
+                          </p>
+
+                          <Button
+                            className="bg-navy hover:bg-navy-dark text-white shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                            onClick={() => router.push(`/medios/${show.id}/${episode.slug}`)}
+                          >
+                            <Play className="mr-2 h-4 w-4" />
+                            {t('podcast.moreInfo')}
+                          </Button>
                         </div>
-
-                        <h3 className="font-heading text-2xl font-semibold mb-3 text-navy-dark leading-tight group-hover:text-gold transition-colors">
-                          {t(episode.titleKey)}
-                        </h3>
-
-                        <p className="text-navy-light leading-relaxed mb-6 line-clamp-3">
-                          {t(episode.descriptionKey)}
-                        </p>
-
-                        <Button
-                          className="bg-navy hover:bg-navy-dark text-white shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
-                          onClick={() => router.push(`/medios/${show.id}/${episode.slug}`)}
-                        >
-                          <Play className="mr-2 h-4 w-4" />
-                          {t('podcast.moreInfo')}
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
           </motion.div>
         </div>

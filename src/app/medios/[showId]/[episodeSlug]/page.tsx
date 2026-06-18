@@ -1,162 +1,242 @@
-"use client";
-
-import { use } from 'react';
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Play, Calendar, Clock, Share2, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import PageWrapper from "@/components/layout/PageWrapper";
-import { Button } from '@/components/ui/button';
+import PageWrapper from '@/components/layout/PageWrapper';
 import { Badge } from '@/components/ui/badge';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { Button } from '@/components/ui/button';
 import { podcastSeries } from '@/data/media';
-import { useToast } from '@/hooks/use-toast';
-import { PodcastEpisodeSEO } from '@/components/seo/PodcastSEO';
+import { getPodcastEpisodeContent } from '@/data/podcastEpisodeContent';
 
-export default function PodcastDetailPage({ params }: { params: Promise<{ showId: string; episodeSlug: string }> }) {
-  const { showId, episodeSlug } = use(params);
-  const { t } = useLanguage();
-  const router = useRouter();
-  const { toast } = useToast();
+const siteUrl = 'https://yosoynosotros.org';
 
-  // Find the series and episode
-  const parentSeries = podcastSeries.find(s => s.id === showId);
-  const episodeData = parentSeries?.episodes.find(ep => ep.slug === episodeSlug);
+const seriesTitles: Record<string, string> = {
+  'yo-soy-nosotros': 'Yo Soy Nosotros',
+  'lo-mejor-esta-por-venir': 'Y lo mejor está por venir',
+  'el-arte-de-ser-empresario': 'El arte de ser empresario',
+  'ecologia-y-espiritualidad': 'Ecología y espiritualidad',
+};
 
-  if (!episodeData || !parentSeries) {
+type EpisodePageParams = {
+  showId: string;
+  episodeSlug: string;
+};
+
+function findEpisode({ showId, episodeSlug }: EpisodePageParams) {
+  const parentSeries = podcastSeries.find((series) => series.id === showId);
+  const episode = parentSeries?.episodes.find((item) => item.slug === episodeSlug);
+
+  if (!parentSeries || !episode) {
+    return null;
+  }
+
+  const suppliedContent = getPodcastEpisodeContent(episode.audioUrl);
+  const title = suppliedContent?.title ?? episode.titleKey;
+  const description = suppliedContent?.description ?? episode.descriptionKey;
+  const embedUrl = suppliedContent?.embedUrl;
+  const episodeNumber = parentSeries.episodes.findIndex((item) => item.slug === episodeSlug) + 1;
+
+  return {
+    parentSeries,
+    episode,
+    suppliedContent,
+    title,
+    description,
+    embedUrl,
+    episodeNumber,
+  };
+}
+
+function truncateDescription(description: string) {
+  return description.length > 160 ? `${description.slice(0, 157)}...` : description;
+}
+
+export function generateStaticParams() {
+  return podcastSeries.flatMap((series) =>
+    series.episodes.map((episode) => ({
+      showId: series.id,
+      episodeSlug: episode.slug,
+    })),
+  );
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<EpisodePageParams>;
+}): Promise<Metadata> {
+  const resolvedParams = await params;
+  const episodePage = findEpisode(resolvedParams);
+
+  if (!episodePage) {
+    return {
+      title: 'Episodio no encontrado | Humanismo Evolutivo',
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const { parentSeries, episode, title, description, episodeNumber } = episodePage;
+  const seriesTitle = seriesTitles[parentSeries.id] ?? parentSeries.id;
+  const url = `${siteUrl}/medios/${parentSeries.id}/${episode.slug}`;
+  const metaDescription = truncateDescription(description);
+
+  return {
+    metadataBase: new URL(siteUrl),
+    title: `${title} | ${seriesTitle}`,
+    description: metaDescription,
+    alternates: {
+      canonical: url,
+    },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+      },
+    },
+    openGraph: {
+      type: 'article',
+      url,
+      title: `${title} | ${seriesTitle}`,
+      description: metaDescription,
+      siteName: 'Humanismo Evolutivo',
+      images: [{ url: parentSeries.coverImage }],
+      publishedTime: episode.date,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${title} | ${seriesTitle}`,
+      description: metaDescription,
+      images: [parentSeries.coverImage],
+    },
+    other: {
+      'podcast:episode': String(episodeNumber),
+    },
+  };
+}
+
+export const dynamicParams = false;
+
+export default async function PodcastDetailPage({
+  params,
+}: {
+  params: Promise<EpisodePageParams>;
+}) {
+  const resolvedParams = await params;
+  const episodePage = findEpisode(resolvedParams);
+
+  if (!episodePage) {
     redirect('/medios');
   }
 
-  // Find prev/next episodes within the same series
-  const currentIndex = parentSeries.episodes.findIndex(ep => ep.slug === episodeSlug);
+  const { parentSeries, episode, title, description, embedUrl, episodeNumber } = episodePage;
+  const currentIndex = parentSeries.episodes.findIndex((item) => item.slug === episode.slug);
   const prevEpisode = currentIndex > 0 ? parentSeries.episodes[currentIndex - 1] : null;
-  const nextEpisode = currentIndex < parentSeries.episodes.length - 1 ? parentSeries.episodes[currentIndex + 1] : null;
+  const nextEpisode =
+    currentIndex < parentSeries.episodes.length - 1 ? parentSeries.episodes[currentIndex + 1] : null;
+  const seriesTitle = seriesTitles[parentSeries.id] ?? parentSeries.id;
+  const pageUrl = `${siteUrl}/medios/${parentSeries.id}/${episode.slug}`;
+  const descriptionParagraphs = description.split(/\n{2,}/).filter(Boolean);
 
-  // Extract Spotify episode ID from URL for embed
-  const getSpotifyEmbedUrl = (audioUrl: string) => {
-    const match = audioUrl.match(/episode\/([a-zA-Z0-9]+)/);
-    if (match) {
-      return `https://open.spotify.com/embed/episode/${match[1]}?utm_source=generator`;
-    }
-    return null;
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'PodcastEpisode',
+    name: title,
+    description,
+    url: pageUrl,
+    datePublished: episode.date,
+    duration: `PT${episode.duration.replace(' min', 'M')}`,
+    episodeNumber,
+    image: parentSeries.coverImage,
+    associatedMedia: embedUrl
+      ? {
+          '@type': 'AudioObject',
+          embedUrl,
+          contentUrl: episode.audioUrl,
+        }
+      : undefined,
+    partOfSeries: {
+      '@type': 'PodcastSeries',
+      name: seriesTitle,
+      author: {
+        '@type': 'Person',
+        name: 'Marcos Constandse Madrazo',
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Fundación Humanismo Evolutivo',
+        url: siteUrl,
+      },
+    },
   };
-
-  const embedUrl = getSpotifyEmbedUrl(episodeData.audioUrl);
 
   return (
     <PageWrapper>
-      <PodcastEpisodeSEO
-        title={t(episodeData.titleKey)}
-        description={t(episodeData.descriptionKey)}
-        seriesTitle={t(parentSeries.titleKey)}
-        coverImage={parentSeries.coverImage}
-        audioUrl={episodeData.audioUrl}
-        duration={episodeData.duration}
-        date={episodeData.date}
-        episodeNumber={currentIndex + 1}
-        url={`https://yosoynosotros.com/medios/${parentSeries.id}/${episodeData.slug}`}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      {/* Hero Section */}
+
       <section className="relative py-20 md:py-32 bg-gradient-to-br from-navy-dark via-navy to-navy-light text-white overflow-hidden">
         <div className="absolute inset-0">
           <div
             className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
-            style={{
-              backgroundImage: `url('${parentSeries.coverImage}')`
-            }}
+            style={{ backgroundImage: `url('${parentSeries.coverImage}')` }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-navy-dark/95 to-navy/80"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-navy-dark/95 to-navy/80" />
         </div>
 
         <div className="container mx-auto px-6 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+          <Link
+            href={`/medios/show/${parentSeries.id}`}
+            className="inline-flex items-center text-white/80 hover:text-white mb-8 transition-colors"
           >
-            <Link
-              href={`/medios/show/${parentSeries.id}`}
-              className="inline-flex items-center text-white/80 hover:text-white mb-8 transition-colors"
-            >
-              <ArrowLeft size={20} className="mr-2" />
-              {t('podcast.backToShow') || 'Volver al podcast'}
-            </Link>
+            <ArrowLeft size={20} className="mr-2" />
+            Volver al podcast
+          </Link>
 
-            <div className="max-w-4xl">
-              <Badge variant="secondary" className="bg-gold/90 text-navy-dark font-medium mb-6">
-                {t(episodeData.categoryKey)}
-              </Badge>
+          <div className="max-w-4xl">
+            <Badge variant="secondary" className="bg-gold/90 text-navy-dark font-medium mb-6">
+              {seriesTitle}
+            </Badge>
 
-              <h1 className="font-heading text-4xl md:text-6xl font-light mb-6 leading-tight">
-                {t(episodeData.titleKey)}
-              </h1>
+            <h1 className="font-heading text-4xl md:text-6xl font-light mb-6 leading-tight">
+              {title}
+            </h1>
 
-              <div className="flex items-center gap-6 text-white/80 mb-8">
-                <div className="flex items-center gap-2">
-                  <Calendar size={18} />
-                  {new Date(episodeData.date).toLocaleDateString('es-ES')}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock size={18} />
-                  {episodeData.duration}
-                </div>
+            <div className="flex flex-wrap items-center gap-6 text-white/80 mb-8">
+              <div className="flex items-center gap-2">
+                <Calendar size={18} />
+                {new Date(episode.date).toLocaleDateString('es-ES')}
               </div>
-
-              <p className="text-xl text-white/90 leading-relaxed mb-8 max-w-3xl">
-                {t(episodeData.descriptionKey)}
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button
-                  size="lg"
-                  className="bg-gold hover:bg-gold/90 text-navy-dark font-medium"
-                  onClick={() => {
-                    (window as any).dataLayer?.push({
-                      event: 'podcast_detail_play_click',
-                      episode_id: episodeData.id,
-                      episode_title: t(episodeData.titleKey)
-                    });
-                    window.open(episodeData.audioUrl, '_blank');
-                  }}
-                >
-                  <Play className="mr-2 h-5 w-5" />
-                  {t('podcast.playOnSpotify') || 'Escuchar en Spotify'}
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-white text-white bg-white/10 hover:bg-white/20"
-                  onClick={() => {
-                    navigator.clipboard.writeText(window.location.href);
-                    toast({
-                      title: t('podcast.linkCopied') || '¡Enlace copiado!',
-                      description: t('podcast.linkCopiedDescription') || 'El enlace del episodio ha sido copiado al portapapeles.',
-                    });
-                  }}
-                >
-                  <Share2 className="mr-2 h-5 w-5" />
-                  {t('podcast.share') || 'Compartir'}
-                </Button>
+              <div className="flex items-center gap-2">
+                <Clock size={18} />
+                {episode.duration}
               </div>
             </div>
-          </motion.div>
+
+            <p className="text-xl text-white/90 leading-relaxed mb-8 max-w-3xl">
+              {descriptionParagraphs[0]}
+            </p>
+
+            <Button asChild size="lg" className="bg-gold hover:bg-gold/90 text-navy-dark font-medium">
+              <a href={episode.audioUrl} target="_blank" rel="noopener noreferrer">
+                Escuchar en Spotify
+                <ExternalLink className="ml-2 h-5 w-5" />
+              </a>
+            </Button>
+          </div>
         </div>
       </section>
 
-      {/* Content Section */}
       <section className="py-16 bg-gradient-to-br from-white via-cream-light/30 to-white">
         <div className="container mx-auto px-6">
           <div className="max-w-4xl mx-auto">
-            {/* Spotify Embed */}
             {embedUrl && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="mb-12"
-              >
+              <div className="mb-12">
                 <iframe
+                  title={`${title} en Spotify`}
                   style={{ borderRadius: '12px' }}
                   src={embedUrl}
                   width="100%"
@@ -166,57 +246,41 @@ export default function PodcastDetailPage({ params }: { params: Promise<{ showId
                   allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
                   loading="lazy"
                 />
-              </motion.div>
+              </div>
             )}
 
-            {/* Episode Description */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="prose prose-lg max-w-none mb-12"
-            >
-              <h2 className="font-heading text-2xl text-navy-dark mb-4">
-                {t('podcast.aboutEpisode') || 'Sobre este episodio'}
-              </h2>
-              <p className="text-navy-light leading-relaxed">
-                {t(episodeData.descriptionKey)}
-              </p>
-            </motion.div>
+            <article className="prose prose-lg max-w-none mb-12">
+              <h2 className="font-heading text-2xl text-navy-dark mb-4">Sobre este episodio</h2>
+              <div className="space-y-5 text-navy-light leading-relaxed">
+                {descriptionParagraphs.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+              </div>
+            </article>
 
-            {/* Navigation to Prev/Next Episodes */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="flex flex-col sm:flex-row justify-between gap-4 pt-8 border-t border-cream"
-            >
+            <div className="flex flex-col sm:flex-row justify-between gap-4 pt-8 border-t border-cream">
               {prevEpisode ? (
-                <Button
-                  variant="outline"
-                  className="flex-1 justify-start"
-                  onClick={() => router.push(`/medios/${parentSeries.id}/${prevEpisode.slug}`)}
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  <span className="truncate">{t(prevEpisode.titleKey)}</span>
+                <Button asChild variant="outline" className="flex-1 justify-start">
+                  <Link href={`/medios/${parentSeries.id}/${prevEpisode.slug}`}>
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Episodio anterior
+                  </Link>
                 </Button>
               ) : (
                 <div className="flex-1" />
               )}
 
               {nextEpisode ? (
-                <Button
-                  variant="outline"
-                  className="flex-1 justify-end"
-                  onClick={() => router.push(`/medios/${parentSeries.id}/${nextEpisode.slug}`)}
-                >
-                  <span className="truncate">{t(nextEpisode.titleKey)}</span>
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                <Button asChild variant="outline" className="flex-1 justify-end">
+                  <Link href={`/medios/${parentSeries.id}/${nextEpisode.slug}`}>
+                    Siguiente episodio
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </Link>
                 </Button>
               ) : (
                 <div className="flex-1" />
               )}
-            </motion.div>
+            </div>
           </div>
         </div>
       </section>

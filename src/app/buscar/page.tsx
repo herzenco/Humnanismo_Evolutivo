@@ -9,6 +9,7 @@ import PageWrapper from "@/components/layout/PageWrapper";
 import { useLanguage } from '@/contexts/LanguageContext';
 import { books } from '@/data/books';
 import { podcasts, videos } from '@/data/media';
+import { getPodcastEpisodeContent } from '@/data/podcastEpisodeContent';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -261,26 +262,31 @@ const Search = () => {
                     </h2>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {searchResults.podcasts.map((podcast) => (
+                    {searchResults.podcasts.map((podcast) => {
+                      const suppliedContent = getPodcastEpisodeContent(podcast.audioUrl);
+                      const podcastTitle = suppliedContent?.title ?? t(podcast.titleKey);
+                      const podcastDescription = suppliedContent?.description ?? t(podcast.descriptionKey);
+
+                      return (
                       <Link
                         key={podcast.id}
-                        href={`/medios/${podcast.id}`}
+                        href={`/medios/${podcast.seriesId}/${podcast.slug}`}
                         className="group bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden"
                       >
                         <div className="aspect-video relative overflow-hidden">
-                          <img
-                            src={podcast.imageUrl}
-                            alt={t(podcast.titleKey)}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          />
+                            <img
+                              src={podcast.imageUrl}
+                              alt={podcastTitle}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            />
                         </div>
                         <div className="p-5">
                           <Badge className="mb-3 text-xs">{t(podcast.categoryKey)}</Badge>
                           <h3 className="font-heading text-lg font-medium text-navy-dark mb-2 group-hover:text-gold transition-colors line-clamp-2">
-                            {t(podcast.titleKey)}
+                            {podcastTitle}
                           </h3>
                           <p className="text-navy-light text-sm mb-3 line-clamp-2">
-                            {t(podcast.descriptionKey)}
+                            {podcastDescription}
                           </p>
                           <div className="flex items-center justify-between text-xs text-navy-light">
                             <span>{podcast.duration}</span>
@@ -288,7 +294,8 @@ const Search = () => {
                           </div>
                         </div>
                       </Link>
-                    ))}
+                    );
+                    })}
                   </div>
                 </motion.div>
               )}

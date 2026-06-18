@@ -19,6 +19,7 @@ export interface PodcastSeries {
 
 export interface Podcast extends PodcastEpisode {
   imageUrl: string;
+  seriesId: string;
 }
 
 export interface Video {
@@ -48,6 +49,16 @@ export const podcastSeries: PodcastSeries[] = [
         date: "2024-01-08",
         categoryKey: "podcast.category.spirituality",
         audioUrl: "https://open.spotify.com/episode/1q8kYGO0nWRZYXYN0ripnw?si=MDvocllTTk-6AAsZaI_Eug"
+      },
+      {
+        id: 50,
+        slug: "el-universo",
+        titleKey: "podcast.ysn.universe.title",
+        descriptionKey: "podcast.ysn.universe.description",
+        duration: "42 min",
+        date: "2024-01-15",
+        categoryKey: "podcast.category.science",
+        audioUrl: "https://open.spotify.com/episode/6U3bkNubfNTnaRcw7qNRCH"
       },
       {
         id: 2,
@@ -367,13 +378,13 @@ export const podcastSeries: PodcastSeries[] = [
       },
       {
         id: 32,
-        slug: "innovacion-y-creatividad",
+        slug: "que-es-ser-empresario",
         titleKey: "podcast.eadse.ep5.title",
         descriptionKey: "podcast.eadse.ep5.description",
         duration: "47 min",
         date: "2024-08-29",
         categoryKey: "podcast.category.business",
-        audioUrl: "https://open.spotify.com/episode/0GuVaEGO7OfpjrwFFR8Mtx"
+        audioUrl: "https://open.spotify.com/episode/18EHnLM83HoZtqiRdL3xFt"
       },
       {
         id: 33,
@@ -501,7 +512,7 @@ export const podcastSeries: PodcastSeries[] = [
         duration: "52 min",
         date: "2024-11-29",
         categoryKey: "podcast.category.economics",
-        audioUrl: "https://open.spotify.com/episode/7I5ES1XJFsryzrRyPThKBi"
+        audioUrl: "https://open.spotify.com/episode/0u8ho1kHsIUyqynmsRQwpM"
       },
       {
         id: 45,
@@ -561,7 +572,8 @@ export const podcastSeries: PodcastSeries[] = [
 export const podcasts: Podcast[] = podcastSeries.flatMap(series => 
   series.episodes.map(ep => ({
     ...ep,
-    imageUrl: series.coverImage
+    imageUrl: series.coverImage,
+    seriesId: series.id
   }))
 );
 

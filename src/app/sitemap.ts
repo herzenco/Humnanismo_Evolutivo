@@ -4,7 +4,7 @@ import { events } from '@/data/events'
 import { podcastSeries } from '@/data/media'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://yosoynosotros.com'
+  const baseUrl = 'https://yosoynosotros.org'
 
   // Static pages
   const staticPages = [
